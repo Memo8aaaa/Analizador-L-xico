@@ -1,4 +1,4 @@
-// Programa de prueba - Lenguajes y Automatas II
+// Programa de prueba - Lenguajes y Automatas II --
 clase @MiClase {
     var entero &cont , &total ;
     var real %prom ;
