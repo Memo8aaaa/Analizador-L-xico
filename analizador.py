@@ -1,6 +1,5 @@
 # ============================================
 # ANALIZADOR DE LÉXICO - Lenguajes y Autómatas II
-# Incluye: Tabla de Símbolos + Tabla de Direcciones
 # ============================================
 
 import re
@@ -40,13 +39,10 @@ CE_TOKENS = {
     ":": -48, "(": -49, ")": -50, "{": -51, "}": -52,
 }
 
-TOK_ID_CLASE   = -53
-TOK_ID_STRING  = -54
-TOK_ID_ENTERO  = -55
-TOK_ID_REAL    = -56
-TOK_CTE_ENTERA = -61
-TOK_CTE_REAL   = -62
-TOK_CTE_CADENA = -63
+TOK_ID_CLASE   = -54  # @
+TOK_ID_ENTERO  = -51  # &
+TOK_ID_REAL    = -52  # %
+TOK_ID_STRING  = -53  # $
 
 # ── Patrones regex ────────────────────────────
 TOKENS = [
@@ -74,45 +70,42 @@ def obtener_token_num(tipo, valor):
     if tipo == 'OP_LOG':     return OP_LOG_TOKENS.get(valor, -41)
     if tipo == 'CE':         return CE_TOKENS.get(valor, -44)
     if tipo == 'ID_CLASE':   return TOK_ID_CLASE
-    if tipo == 'ID_STRING':  return TOK_ID_STRING
     if tipo == 'ID_ENTERO':  return TOK_ID_ENTERO
     if tipo == 'ID_REAL':    return TOK_ID_REAL
-    if tipo == 'CTE_ENTERA': return TOK_CTE_ENTERA
-    if tipo == 'CTE_REAL':   return TOK_CTE_REAL
-    if tipo == 'CTE_CADENA': return TOK_CTE_CADENA
+    if tipo == 'ID_STRING':  return TOK_ID_STRING
     return -99
 
-TIPOS_ID   = {'ID_CLASE', 'ID_STRING', 'ID_ENTERO', 'ID_REAL'}
-TIPOS_CTE  = {'CTE_ENTERA', 'CTE_REAL', 'CTE_CADENA'}
-TOKENS_CON_TABLA = TIPOS_ID | TIPOS_CTE
+# ── Tablas ────────────────────────────────────
 
-# ── Tablas de semántica ───────────────────────
-tabla_simbolos   = []   # (id, token, valor, d1, d2, ptr, ambito)
-tabla_direcciones = []  # (id, token, num_linea, vci)
+# Tabla de Símbolos: para &entero, %real, $string
+# columnas: ID, lexema, token, valor, D1, D2, ámbito
+tabla_simbolos = []
 
-contador_sim = 0   # posición en tabla de símbolos
-contador_dir = 0   # posición en tabla de direcciones
+# Tabla de Direcciones: para @clase
+# columnas: ID, lexema, token, #linea, VCI
+tabla_direcciones = []
+
 ambito_actual = "global"
 
-def buscar_en_tabla_simbolos(lexema):
+def buscar_simbolo(lexema):
+    """Busca un lexema en tabla de símbolos, regresa su posición o -1"""
     for i, entrada in enumerate(tabla_simbolos):
-        if entrada[0] == lexema:
+        if entrada[1] == lexema and entrada[6] == ambito_actual:
             return i
     return -1
 
-def agregar_simbolo(lexema, token_num, valor=""):
-    global contador_sim
-    pos = buscar_en_tabla_simbolos(lexema)
+def agregar_simbolo(lexema, token_num):
+    """Agrega a tabla de símbolos si no existe en el ámbito actual"""
+    pos = buscar_simbolo(lexema)
     if pos == -1:
-        tabla_simbolos.append([lexema, token_num, valor, 0, 0, -1, ambito_actual])
-        pos = contador_sim
-        contador_sim += 1
+        pos = len(tabla_simbolos)
+        tabla_simbolos.append([pos, lexema, token_num, 0, 0, 0, ambito_actual])
     return pos
 
-def agregar_direccion(lexema, token_num, linea, pos_tabla):
-    global contador_dir
-    tabla_direcciones.append([lexema, token_num, linea, pos_tabla])
-    contador_dir += 1
+def agregar_direccion(lexema, token_num, linea):
+    """Agrega a tabla de direcciones, siempre (cada aparición)"""
+    vci = len(tabla_direcciones)
+    tabla_direcciones.append([vci, lexema, token_num, linea, 0])
 
 # ── Analizador léxico ─────────────────────────
 def analizar_lexico(codigo):
@@ -120,7 +113,8 @@ def analizar_lexico(codigo):
     tokens_encontrados = []
     posicion = 0
     linea_actual = 1
-    ultima_palabra = ""
+    ultima_keyword = ""
+    dentro_de_clase = False
 
     while posicion < len(codigo):
         match_encontrado = False
@@ -134,26 +128,46 @@ def analizar_lexico(codigo):
 
                 if tipo_token in ('ESPACIO', 'COMENTARIO'):
                     pass
+
                 elif tipo_token == 'SALTO_LINEA':
                     linea_actual += 1
+
                 else:
                     tok_num = obtener_token_num(tipo_token, valor)
 
-                    # Detectar cambio de ámbito
-                    if tipo_token == 'KEYWORD' and valor in ('clase', 'metodo'):
-                        ultima_palabra = valor
-                    elif tipo_token == 'ID_CLASE' and ultima_palabra in ('clase', 'metodo'):
-                        ambito_actual = valor
-                        ultima_palabra = ""
+                    # Rastrear última keyword para saber qué sigue
+                    if tipo_token == 'KEYWORD':
+                        ultima_keyword = valor
+                        # Cuando encontramos "clase", activamos bandera
+                        if valor == 'clase':
+                            dentro_de_clase = True
 
-                    # Manejar tabla de símbolos y direcciones
-                    if tipo_token in TOKENS_CON_TABLA:
-                        pos_sim = agregar_simbolo(valor, tok_num)
-                        agregar_direccion(valor, tok_num, linea_actual, pos_sim)
-                        p_en_t = pos_sim
-                    else:
-                        p_en_t = -1
+                    elif tipo_token == 'ID_CLASE':
+                        # Cambiar ámbito según lo que venía antes
+                        if ultima_keyword == 'clase':
+                            # Es la clase principal, ámbito = nombre de clase
+                            ambito_actual = valor
+                        elif ultima_keyword in ('metodo', 'ejecutar'):
+                            # Es un método, ámbito cambia al método
+                            ambito_actual = valor
 
+                        agregar_direccion(valor, tok_num, linea_actual)
+                        p_en_t = len(tabla_direcciones) - 1
+                        tokens_encontrados.append((valor, tok_num, p_en_t, linea_actual))
+                        ultima_keyword = ""
+                        posicion = match.end()
+                        match_encontrado = True
+                        break
+
+                    elif tipo_token in ('ID_ENTERO', 'ID_REAL', 'ID_STRING'):
+                        pos = agregar_simbolo(valor, tok_num)
+                        p_en_t = pos
+                        tokens_encontrados.append((valor, tok_num, p_en_t, linea_actual))
+                        posicion = match.end()
+                        match_encontrado = True
+                        break
+
+                    p_en_t = -1
                     tokens_encontrados.append((valor, tok_num, p_en_t, linea_actual))
 
                 posicion = match.end()
@@ -202,21 +216,23 @@ for i, (lexema, token, p_en_t, linea) in enumerate(resultado, 1):
 
 # ── Imprimir Tabla de Símbolos ────────────────
 print("\n" + "=" * 55)
-print("  TABLA DE SÍMBOLOS")
+print("  TABLA DE SÍMBOLOS (&entero, %real, $string)")
 print("=" * 55)
-print(f"\n  {'ID':<5} {'Lexema':<12} {'Token':>7} {'Valor':>8} {'D1':>5} {'D2':>5} {'PTR':>5} {'Ámbito':<12}")
-print("  " + "-" * 65)
-for i, (lex, tok, val, d1, d2, ptr, amb) in enumerate(tabla_simbolos):
-    print(f"  {i:<5} {lex:<12} {tok:>7} {str(val):>8} {d1:>5} {d2:>5} {ptr:>5} {amb:<12}")
+print(f"\n  {'ID':<5} {'Lexema':<12} {'Token':>7} {'Valor':>8} {'D1':>5} {'D2':>5} {'Ámbito':<12}")
+print("  " + "-" * 60)
+for entrada in tabla_simbolos:
+    id_, lex, tok, val, d1, d2, amb = entrada
+    print(f"  {id_:<5} {lex:<12} {tok:>7} {str(val):>8} {d1:>5} {d2:>5} {amb:<12}")
 
 # ── Imprimir Tabla de Direcciones ─────────────
 print("\n" + "=" * 55)
-print("  TABLA DE DIRECCIONES")
+print("  TABLA DE DIRECCIONES (@clase)")
 print("=" * 55)
 print(f"\n  {'ID':<5} {'Lexema':<15} {'Token':>7} {'# Lin':>7} {'VCI':>5}")
 print("  " + "-" * 50)
-for i, (lex, tok, lin, vci) in enumerate(tabla_direcciones):
-    print(f"  {i:<5} {lex:<15} {tok:>7} {lin:>7} {vci:>5}")
+for entrada in tabla_direcciones:
+    id_, lex, tok, lin, vci = entrada
+    print(f"  {id_:<5} {lex:<15} {tok:>7} {lin:>7} {vci:>5}")
 
 print(f"\n  Total tokens: {len(resultado)}")
 print(f"  Total símbolos: {len(tabla_simbolos)}")
