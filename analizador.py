@@ -69,6 +69,9 @@ def obtener_token_num(tipo, valor):
     if tipo == 'OP_REL':     return OP_REL_TOKENS.get(valor, -35)
     if tipo == 'OP_LOG':     return OP_LOG_TOKENS.get(valor, -41)
     if tipo == 'CE':         return CE_TOKENS.get(valor, -44)
+    if tipo == 'CTE_ENTERA':  return -61
+    if tipo == 'CTE_REAL':    return -62
+    if tipo == 'CTE_CADENA':  return -63
     if tipo == 'ID_CLASE':   return TOK_ID_CLASE
     if tipo == 'ID_ENTERO':  return TOK_ID_ENTERO
     if tipo == 'ID_REAL':    return TOK_ID_REAL
@@ -88,15 +91,15 @@ tabla_direcciones = []
 ambito_actual = "global"
 
 def buscar_simbolo(lexema):
-    """Busca un lexema en tabla de símbolos, regresa su posición o -1"""
+    """Busca un lexema en tabla de símbolos en el ámbito actual"""
     for i, entrada in enumerate(tabla_simbolos):
         if entrada[1] == lexema and entrada[6] == ambito_actual:
             return i
     return -1
 
 def agregar_simbolo(lexema, token_num):
-    """Agrega a tabla de símbolos si no existe en el ámbito actual"""
     pos = buscar_simbolo(lexema)
+    print(f"  DEBUG: buscando {lexema} en ámbito '{ambito_actual}' → pos={pos}")
     if pos == -1:
         pos = len(tabla_simbolos)
         tabla_simbolos.append([pos, lexema, token_num, 0, 0, 0, ambito_actual])
@@ -114,7 +117,8 @@ def analizar_lexico(codigo):
     posicion = 0
     linea_actual = 1
     ultima_keyword = ""
-    dentro_de_clase = False
+    ambito_clase = "global"    # ámbito de la clase principal
+    ambito_metodo = "global"   # ámbito del método actual
 
     while posicion < len(codigo):
         match_encontrado = False
@@ -135,21 +139,23 @@ def analizar_lexico(codigo):
                 else:
                     tok_num = obtener_token_num(tipo_token, valor)
 
-                    # Rastrear última keyword para saber qué sigue
-                    if tipo_token == 'KEYWORD':
+                if tipo_token == 'KEYWORD':
+                    if valor in ('clase', 'metodo', 'ejecutar'):
                         ultima_keyword = valor
-                        # Cuando encontramos "clase", activamos bandera
-                        if valor == 'clase':
-                            dentro_de_clase = True
 
                     elif tipo_token == 'ID_CLASE':
-                        # Cambiar ámbito según lo que venía antes
                         if ultima_keyword == 'clase':
-                            # Es la clase principal, ámbito = nombre de clase
+                            # Es la clase principal
+                            ambito_clase  = valor
                             ambito_actual = valor
-                        elif ultima_keyword in ('metodo', 'ejecutar'):
-                            # Es un método, ámbito cambia al método
+                            ambito_metodo = valor
+                        elif ultima_keyword == 'metodo':
+                            # Es un método — cambia ámbito real
+                            ambito_metodo = valor
                             ambito_actual = valor
+                        elif ultima_keyword == 'ejecutar':
+                            # Es una LLAMADA — NO cambia ámbito
+                            pass
 
                         agregar_direccion(valor, tok_num, linea_actual)
                         p_en_t = len(tabla_direcciones) - 1
