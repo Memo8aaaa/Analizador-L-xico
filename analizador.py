@@ -98,7 +98,7 @@ print("=" * 55)
 
 resultado = analizar_lexico(codigo_prueba)
 
-print(f"\n{'TIPO':<20} {'VALOR':<15} {'P EN T':>6}  {'LÍNEA':>5}")
+print(f"\n{'LEXEMA':<20} {'TOKEN':<15} {'P EN T':>6}  {'LÍNEA':>5}")
 print("-" * 55)
 for tipo, valor, p_en_t, linea in resultado:
     print(f"{tipo:<20} {valor:<15} {p_en_t:>6}  {linea:>5}")

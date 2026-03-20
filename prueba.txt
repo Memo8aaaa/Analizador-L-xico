@@ -1,0 +1,38 @@
+// Programa de prueba - Lenguajes y Automatas II
+clase @MiClase {
+    var entero &cont , &total ;
+    var real %prom ;
+    var cadena $nom ;
+
+    metodo @calc( &x , &y ) {
+        &suma = &x + &y ;
+        si ( &suma > 100 ) {
+            &cont += 1 ;
+        } sino {
+            &total = &suma * 2 ;
+        }
+        regresar ( &suma ) ;
+    }
+
+    metodo @princ( ) {
+        leer ( &cont , %prom ) ;
+        escribir ( $nom , &cont ) ;
+
+        mientras ( &cont != 0 ) {
+            &cont -- ;
+        }
+
+        repite {
+            &total = &total + 1 ;
+        } mientras ( &total < 50 ) ;
+
+        switch ( &cont ) {
+            encaso 1 : &cont = 10 ;
+            encaso 2 : &total = 20 ;
+            default : salir ;
+        }
+
+        ejecutar &res = @calc ( &cont , &total ) ;
+        regresar ( &res ) ;
+    }
+}
