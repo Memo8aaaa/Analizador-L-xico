@@ -36,44 +36,53 @@ TOKENS = [
     
     # Saltar espacios y saltos de línea (los ignoramos)
     ('SALTO_LINEA',    r'\n'),
-    ('ESPACIO',        r'[ \t]+'),   # este lo vamos a ignorar
+    ('ESPACIO',        r'[ \t]+'),
 ]
 
+# Tokens que SÍ tienen tabla propia → P en T = -2
+# (identificadores, constantes numéricas, cadenas)
+TOKENS_CON_TABLA = {'IDENTIFICADOR', 'ENTERO', 'FLOAT', 'CADENA'}
+
 def analizar_lexico(codigo):
-    """
-    Recibe un string con código MiniLang.
-    Regresa una lista de tokens encontrados.
-    """
     tokens_encontrados = []
-    posicion = 0          
-    linea_actual = 1      
+    posicion = 0
+    linea_actual = 1
 
     while posicion < len(codigo):
-        
-        match_encontrado = False  
+        match_encontrado = False
 
         for tipo_token, patron in TOKENS:
             regex = re.compile(patron)
             match = regex.match(codigo, posicion)
 
             if match:
-                valor = match.group(0)  
+                valor = match.group(0)
+
                 if tipo_token == 'ESPACIO':
                     pass
                 elif tipo_token == 'SALTO_LINEA':
-                    linea_actual += 1     
+                    linea_actual += 1
                 else:
-                    tokens_encontrados.append((tipo_token, valor, linea_actual))
+                    # P en T:
+                    #  -1 → no tiene tabla propia (PR, operadores, símbolos)
+                    #  -2 → tiene tabla propia (identificadores y constantes)
+                    if tipo_token in TOKENS_CON_TABLA:
+                        p_en_t = -2
+                    else:
+                        p_en_t = -1
 
-                posicion = match.end()  
+                    tokens_encontrados.append((tipo_token, valor, p_en_t, linea_actual))
+
+                posicion = match.end()
                 match_encontrado = True
-                break  
+                break
 
         if not match_encontrado:
             print(f"❌ Error léxico en línea {linea_actual}: carácter inesperado '{codigo[posicion]}'")
-            posicion += 1  
+            posicion += 1
 
     return tokens_encontrados
+
 
 codigo_prueba = """
 int x = 5
@@ -83,15 +92,15 @@ if x > y {
 }
 """
 
-print("=" * 50)
-print("ANÁLISIS LÉXICO DE MiniLang")
-print("=" * 50)
+print("=" * 55)
+print("       ANÁLISIS LÉXICO DE MiniLang")
+print("=" * 55)
 
 resultado = analizar_lexico(codigo_prueba)
 
-print(f"\n{'TIPO':<20} {'VALOR':<15} {'LÍNEA'}")
-print("-" * 45)
-for tipo, valor, linea in resultado:
-    print(f"{tipo:<20} {valor:<15} {linea}")
+print(f"\n{'TIPO':<20} {'VALOR':<15} {'P EN T':>6}  {'LÍNEA':>5}")
+print("-" * 55)
+for tipo, valor, p_en_t, linea in resultado:
+    print(f"{tipo:<20} {valor:<15} {p_en_t:>6}  {linea:>5}")
 
 print(f"\n✅ Total de tokens encontrados: {len(resultado)}")
