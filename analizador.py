@@ -154,4 +154,3 @@ print("-" * 52)
 for lexema, token, p_en_t, linea in resultado:
     print(f"{lexema:<18} {token:>7}  {p_en_t:>7}  {linea:>7}")
 
-print(f"\n✅ Total de tokens encontrados: {len(resultado)}")
